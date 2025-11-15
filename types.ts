@@ -12,6 +12,7 @@ export interface Video {
   advertiser: string;
   duration?: string; // Optional duration string e.g., "5:32"
   thumbnail?: string; // Optional thumbnail URL
+  isEmbeddable?: boolean;
 }
 
 export type CampaignStatus = 'Aprovado' | 'Rejeitado' | 'Pendente';

@@ -64,29 +64,57 @@ const App: React.FC = () => {
     return `${minutes}m ${seconds}s`;
   };
 
-  const handleAddVideoToLibrary = (video: Video) => {
-    setVideoLibrary(prev => [...prev, video]);
+  const handleAddVideosToLibrary = (videos: Video[]) => {
+    setVideoLibrary(prev => {
+      const videoMap = new Map(prev.map(v => [v.id, v]));
+      videos.forEach(v => videoMap.set(v.id, v));
+      return Array.from(videoMap.values());
+    });
   };
-  
-  const handleCreateCampaign = (campaign: Omit<Campaign, 'id' | 'status'>) => {
-     const newCampaign: Campaign = {
-        ...campaign,
-        id: `camp-${Date.now()}`,
-        status: 'Pendente'
-     };
-     setCampaigns(prev => [...prev, newCampaign]);
+
+  const handleDeleteVideoFromLibrary = (videoId: string) => {
+    setVideoLibrary(prev => prev.filter(v => v.id !== videoId));
+    // Also remove from any campaign that might contain it
+    setCampaigns(prev => prev.map(c => ({
+        ...c, 
+        videos: c.videos.filter(v => v.id !== videoId) 
+    })).filter(c => c.videos.length > 0)); // Optional: remove empty campaigns
   };
 
   const handleUpdateCampaignStatus = (campaignId: string, status: CampaignStatus) => {
     setCampaigns(prev => prev.map(c => c.id === campaignId ? { ...c, status } : c));
   };
 
+  const handleDeleteCampaign = (campaignId: string) => {
+    setCampaigns(prev => prev.filter(c => c.id !== campaignId));
+    // Note: This doesn't remove videos from the videoLibrary, allowing them to be reused.
+  };
+
+  const handleQuickAddAndApprove = (videos: Video[]) => {
+    // 1. Add videos to the library
+    handleAddVideosToLibrary(videos);
+
+    // 2. Create and approve a new campaign for these videos
+    const quickCampaign: Campaign = {
+        id: `camp-quick-${Date.now()}`,
+        name: `Campanha Rápida (${videos.length} vídeo${videos.length > 1 ? 's' : ''})`,
+        advertiser: 'Admin Quick-Add',
+        budget: 100000, // Default budget
+        costPerSecond: MOCK_CAMPAIGN.costPerSecond,
+        // Ensure videos in campaign have advertiser info
+        videos: videos.map(v => ({ ...v, advertiser: 'Admin Quick-Add' })),
+        status: 'Aprovado'
+    };
+    setCampaigns(prev => [...prev, quickCampaign]);
+  };
+
+  // The source of truth for the UserView.
   // Collect all videos from all approved campaigns and ensure the list is unique.
   const approvedVideos = Array.from(
       campaigns
           .filter(c => c.status === 'Aprovado')
           .flatMap(c => c.videos)
-          .reduce((map, video) => map.set(video.id, video), new Map<string, Video>())
+          .reduce((map, video) => map.set(video.youtubeId, video), new Map<string, Video>()) // Use youtubeId for uniqueness
           .values()
   );
 
@@ -96,12 +124,9 @@ const App: React.FC = () => {
         case View.User:
             return (
                 <UserView
-                    user={currentUser}
                     videos={approvedVideos}
                     onTimeUpdate={handleTimeUpdate}
                     onVideoStart={handleVideoStart}
-                    formatCurrency={formatCurrency}
-                    formatTime={formatTime}
                 />
             );
         case View.Advertiser:
@@ -118,9 +143,11 @@ const App: React.FC = () => {
                 <AdminView 
                     campaigns={campaigns}
                     videoLibrary={videoLibrary}
-                    onAddVideo={handleAddVideoToLibrary}
-                    onCreateCampaign={handleCreateCampaign}
+                    onAddVideos={handleAddVideosToLibrary}
                     onUpdateStatus={handleUpdateCampaignStatus}
+                    onDeleteVideo={handleDeleteVideoFromLibrary}
+                    onDeleteCampaign={handleDeleteCampaign}
+                    onQuickAddAndApprove={handleQuickAddAndApprove}
                 />
             );
         default:
@@ -129,7 +156,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white font-sans">
+    <div className="min-h-screen h-screen bg-gray-900 text-white font-sans flex flex-col overflow-hidden">
       <Header 
         activeView={activeView} 
         setActiveView={setActiveView}
@@ -137,14 +164,16 @@ const App: React.FC = () => {
         balance={formatCurrency(currentUser.balance)}
       />
 
-      <main className="p-4 md:p-8">
+      <main className={`flex-grow ${activeView === View.User ? "" : "p-4 md:p-8 overflow-y-auto"}`}>
         {renderContent()}
       </main>
       
-      <footer className="text-center p-4 text-gray-500 text-sm">
-          <p>&copy; 2024 WatchCash. Todos os direitos reservados.</p>
-          <p className="mt-1">Esta é uma aplicação de demonstração. As recompensas são simuladas.</p>
-      </footer>
+      {activeView !== View.User && (
+        <footer className="text-center p-4 text-gray-500 text-sm">
+            <p>&copy; 2024 WatchCash. Todos os direitos reservados.</p>
+            <p className="mt-1">Esta é uma aplicação de demonstração. As recompensas são simuladas.</p>
+        </footer>
+      )}
     </div>
   );
 };
