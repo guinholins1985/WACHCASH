@@ -1,0 +1,5 @@
+{
+  "name": "WatchCash: Earn by Watching",
+  "description": "A web application that allows users to earn rewards by watching promotional YouTube videos. It features a user dashboard for tracking earnings and an advertiser panel for monitoring campaign performance.",
+  "requestFramePermissions": []
+}
